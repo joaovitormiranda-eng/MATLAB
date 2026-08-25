@@ -1,0 +1,277 @@
+%% EXPERIMENTO 3 - LAB FUNDAMENTOS DE CONTROLE
+% Parte 1: Polos dominantes
+% Parte 2: Estabilidade em malha fechada
+clear; clc; close all;
+
+% =========================
+% CONFIGURAÇÕES GLOBAIS DE TEMA ESCURO
+% =========================
+set(groot,'defaultFigureColor','k')
+set(groot,'defaultAxesColor',[0.10 0.10 0.10])
+set(groot,'defaultAxesXColor','w')
+set(groot,'defaultAxesYColor','w')
+set(groot,'defaultTextColor','w')
+set(groot,'defaultAxesGridColor',[0.7 0.7 0.7])
+set(groot,'defaultLegendTextColor','w')
+set(groot,'defaultLegendColor',[0.15 0.15 0.15])
+set(groot,'defaultAxesFontSize',13)
+set(groot,'defaultLineLineWidth',1.8)
+
+%% =========================
+% DADOS DO CIRCUITO (PARTE 1)
+% =========================
+s = tf('s');
+
+% Circuito RLC
+L = 596.7e-3;       % H
+Crlc = 69e-9;       % F
+wn = 1/sqrt(L*Crlc);
+Rc = 2*L*wn;
+
+R_sub  = Rc/2;
+R_crit = Rc;
+R_sobre = 2*Rc;
+
+fprintf('--- PARTE 1: PARÂMETROS RLC ---\n');
+fprintf('wn = %.3f rad/s\n', wn);
+fprintf('Rc = %.3f ohms = %.3f kohms\n', Rc, Rc/1000);
+
+% Fatores de amortecimento (xi)
+xi_sub   = R_sub   / (2*L*wn);
+xi_crit  = R_crit  / (2*L*wn);
+xi_sobre = R_sobre / (2*L*wn);
+
+fprintf('\n--- FATORES DE AMORTECIMENTO (xi) ---\n');
+fprintf('Para R = Rc/2 (Subamortecido): xi = %.3f\n', xi_sub);
+fprintf('Para R = Rc   (Criticamente amortecido): xi = %.3f\n', xi_crit);
+fprintf('Para R = 2Rc  (Sobreamortecido): xi = %.3f\n', xi_sobre);
+
+% Integrador superior (CORRIGIDO PARA POLO REAL EM -206 rad/s)
+Rint = 220e3;
+Cint = 22e-9;
+Tint = Rint*Cint;
+Gint = 1/(Tint*s + 1);     
+fprintf('\nTint = %.6f s\n', Tint);
+
+%% Funções de Transferência 
+G_RLC = @(R) 1/(L*Crlc*s^2 + R*Crlc*s + 1);
+Gsub   = G_RLC(R_sub);
+Gcrit  = G_RLC(R_crit);
+Gsobre = G_RLC(R_sobre);
+
+% Sistema de 3ª ordem: integrador + RLC
+G3_sub   = Gint*Gsub;
+G3_crit  = Gint*Gcrit;
+G3_sobre = Gint*Gsobre;
+
+%% Espaço de Estados para R = Rc
+[num_G3, den_G3] = tfdata(G3_crit, 'v');
+[A, B, C, D] = tf2ss(num_G3, den_G3);
+fprintf('\n--- MODELO EM ESPAÇO DE ESTADOS PARA R = Rc (tf2ss) ---\n');
+disp('Matriz A:'); disp(A);
+disp('Matriz B:'); disp(B);
+disp('Matriz C:'); disp(C);
+disp('Matriz D:'); disp(D);
+
+%% =========================
+% PARTE 1 - RESPOSTAS AO DEGRAU (COM ZOOM)
+% =========================
+% Definindo um vetor de tempo curto (50 ms) para ver o transitório
+t_sim = 0:1e-4:0.05;
+
+figure; % Fig 1
+step(Gsub, Gcrit, Gsobre, t_sim);
+grid on; title('Resposta ao degrau do circuito RLC');
+legend('R = Rc/2', 'R = Rc', 'R = 2Rc', 'Location','best');
+
+figure; % Fig 2
+step(G3_sub, G3_crit, G3_sobre, t_sim);
+grid on; title('Resposta ao degrau do sistema de 3ª ordem');
+legend('R = Rc/2', 'R = Rc', 'R = 2Rc', 'Location','best');
+
+figure; % Fig 3
+step(Gint, G3_crit, t_sim);
+grid on; title('Malha Aberta: Integrador vs Sist. 3ª ordem (R=Rc)');
+legend('Integrador', 'Integrador + RLC com R = Rc', 'Location','best');
+
+% Comparação em Malha Fechada
+T_int = feedback(Gint, 1);
+T_G3_crit = feedback(G3_crit, 1);
+figure; % Fig 4
+step(T_int, T_G3_crit, t_sim);
+grid on; title('Malha Fechada: Integrador vs Sist. 3ª ordem (R=Rc)');
+legend('Integrador (Malha Fechada)', 'Sist. 3ª ordem (Malha Fechada)', 'Location','best');
+
+%% =========================
+% POLOS DOS SISTEMAS (PARTE 1)
+% =========================
+p_sub = pole(G3_sub);
+p_crit = pole(G3_crit);
+p_sobre = pole(G3_sobre);
+fprintf('\n--- POLOS DO SISTEMA DE 3ª ORDEM ---\n');
+disp('Polos para R = Rc/2:'); disp(p_sub);
+disp('Polos para R = Rc:');   disp(p_crit);
+disp('Polos para R = 2Rc:');  disp(p_sobre);
+
+figure; % Fig 5
+plot(real(p_sub), imag(p_sub), 'o', 'LineWidth', 1.5); hold on;
+plot(real(p_crit), imag(p_crit), 's', 'LineWidth', 1.5);
+plot(real(p_sobre), imag(p_sobre), '^', 'LineWidth', 1.5);
+xline(0,'w--'); yline(0,'w--');
+grid on; xlabel('Parte real'); ylabel('Parte imaginária');
+title('Polos do sistema de 3ª ordem no plano-s');
+legend('R = Rc/2', 'R = Rc', 'R = 2Rc', 'Location','best');
+
+%% NUVEM DE POLOS DO RLC
+Rmin = 894;       
+Rmax = 10000;     
+Rvec = linspace(Rmin, Rmax, 300);
+polos_rlc_1 = zeros(size(Rvec));
+polos_rlc_2 = zeros(size(Rvec));
+
+for k = 1:length(Rvec)
+    polos = pole(G_RLC(Rvec(k)));
+    polos_rlc_1(k) = polos(1);
+    polos_rlc_2(k) = polos(2);
+end
+
+figure; % Fig 6
+plot(real(polos_rlc_1), imag(polos_rlc_1), '.', 'MarkerSize', 8); hold on;
+plot(real(polos_rlc_2), imag(polos_rlc_2), '.', 'MarkerSize', 8);
+plot(-1/Tint,0,'rx','LineWidth',2,'MarkerSize',10); % polo real do integrador corrigido
+xline(0,'w--'); yline(0,'w--');
+grid on; xlabel('Parte real'); ylabel('Parte imaginária');
+title('Nuvem de polos do RLC e polo do integrador');
+legend('Polo RLC 1', 'Polo RLC 2', 'Polo do integrador (Dominante)', 'Location','best');
+
+%% BODE PARTE 1
+figure; % Fig 7
+bode(Gint, Gcrit, G3_crit);
+grid on; title('Diagramas de Bode Teóricos (Parte 1)');
+legend('Integrador', 'RLC com R = Rc', 'Sistema de 3ª ordem', 'Location','best');
+
+%% =======================================================
+% PARTE 2 - ESTABILIDADE (SISTEMA RC + RLC EM MALHA FECHADA)
+% =======================================================
+fprintf('\n\n=================================================\n');
+fprintf('--- PARTE 2: ESTABILIDADE EM MALHA FECHADA ---\n');
+
+Rrc = 95e3;        
+Crc = 10e-9;       
+G_RC = 1/(Rrc*Crc*s + 1);
+
+G0_Rc  = G_RC * Gcrit;
+G0_2Rc = G_RC * Gsobre;
+
+%% LUGAR DAS RAÍZES (Root Locus)
+figure; % Fig 8
+rlocus(G0_Rc); grid on;
+title('Lugar das raízes para R = Rc');
+
+figure; % Fig 9
+rlocus(G0_2Rc); grid on;
+title('Lugar das raízes para R = 2Rc');
+
+%% NYQUIST
+figure; % Fig 10
+nyquist(G0_Rc); grid on;
+title('Nyquist para R = Rc');
+
+figure; % Fig 11
+nyquist(G0_2Rc); grid on;
+title('Nyquist para R = 2Rc');
+
+%% MARGENS E GANHO CRÍTICO
+[GM_Rc, PM_Rc, Wcg_Rc, Wcp_Rc] = margin(G0_Rc);
+[GM_2Rc, PM_2Rc, Wcg_2Rc, Wcp_2Rc] = margin(G0_2Rc);
+
+Kc_Rc = GM_Rc;
+Kc_2Rc = GM_2Rc;
+
+fprintf('\n--- MARGENS E GANHO CRÍTICO (Kc) ---\n');
+fprintf('R = Rc:\n');
+fprintf('GM = %.4f | PM = %.2f graus | Wcg = %.2f rad/s | Kc teórico = %.4f\n', GM_Rc, PM_Rc, Wcg_Rc, Kc_Rc);
+fprintf('\nR = 2Rc:\n');
+fprintf('GM = %.4f | PM = %.2f graus | Wcg = %.2f rad/s | Kc teórico = %.4f\n', GM_2Rc, PM_2Rc, Wcg_2Rc, Kc_2Rc);
+
+figure; % Fig 12
+margin(Kc_Rc * G0_Rc); grid on;
+title('Bode com Ganho Crítico Aplicado - R = Rc');
+
+figure; % Fig 13
+margin(Kc_2Rc * G0_2Rc); grid on;
+title('Bode com Ganho Crítico Aplicado - R = 2Rc');
+
+%% RESPOSTA AO DEGRAU EM MALHA FECHADA COM GANHO CRÍTICO
+T_Rc_Kc  = feedback(Kc_Rc*G0_Rc, 1);
+T_2Rc_Kc = feedback(Kc_2Rc*G0_2Rc, 1);
+
+figure; % Fig 14
+step(T_Rc_Kc); grid on;
+title('Resposta ao degrau (Malha Fechada) com Kc - R = Rc');
+
+figure; % Fig 15
+step(T_2Rc_Kc); grid on;
+title('Resposta ao degrau (Malha Fechada) com Kc - R = 2Rc');
+
+%% POSIÇÃO DOS POLOS E DADOS EXPERIMENTAIS
+ganhos_teste = [0.1, 0.2, 0.3]; 
+fprintf('\n--- POLOS TEÓRICOS MALHA FECHADA PARA DIFERENTES GANHOS (Tabela 1) ---\n');
+for i = 1:length(ganhos_teste)
+    K_aplicado = ganhos_teste(i) * Kc_Rc;
+    polos_MF = pole(feedback(K_aplicado * G0_Rc, 1));
+    fprintf('Ganhos K = %.2f * K_max (Kc): \n', ganhos_teste(i));
+    disp(polos_MF);
+end
+
+K_labels = categorical({'0.1Kmax','0.2Kmax','0.3Kmax'});
+Mp_Rc_exp  = [0.192 0.420 0.560];
+Mp_2Rc_exp = [0.072 0.170 0.264];
+
+figure; % Fig 16
+bar(K_labels, [Mp_Rc_exp(:), Mp_2Rc_exp(:)]);
+grid on; ylabel('M_p (V)');
+title('Sobressinal experimental em função do ganho');
+legend('R = Rc', 'R = 2Rc', 'Location','northwest');
+
+%% =======================================================
+%% =======================================================
+% SALVAMENTO AUTOMÁTICO DE FIGURAS PARA O OVERLEAF
+% =======================================================
+fprintf('\n--- INICIANDO SALVAMENTO DAS FIGURAS ---\n');
+pasta_destino = 'figuras_exp3';
+if ~exist(pasta_destino, 'dir')
+    mkdir(pasta_destino); 
+end
+
+nomes_figuras = {
+    'parte1_step_rlc', ...          % Fig 1
+    'parte1_step_3ordem', ...       % Fig 2
+    'parte1_step_MA_int_vs_3o', ... % Fig 3
+    'parte1_step_MF_int_vs_3o', ... % Fig 4
+    'parte1_polos_3ordem', ...      % Fig 5
+    'parte1_nuvem_polos', ...       % Fig 6
+    'parte1_bode', ...              % Fig 7
+    'parte2_rlocus_Rc', ...         % Fig 8
+    'parte2_rlocus_2Rc', ...        % Fig 9
+    'parte2_nyquist_Rc', ...        % Fig 10
+    'parte2_nyquist_2Rc', ...       % Fig 11
+    'parte2_bode_margens_Rc', ...   % Fig 12
+    'parte2_bode_margens_2Rc', ...  % Fig 13
+    'parte2_step_MF_Rc', ...        % Fig 14
+    'parte2_step_MF_2Rc', ...       % Fig 15
+    'parte2_sobressinal_exp'        % Fig 16
+};
+
+for i = 1:length(nomes_figuras)
+    % Chama EXATAMENTE a Figura i (1, 2, 3...) para o topo
+    fig = figure(i); 
+    
+    % Monta o nome do arquivo com base na lista
+    nome_arquivo = fullfile(pasta_destino, sprintf('%s.png', nomes_figuras{i}));
+    
+    % Exporta a figura selecionada
+    exportgraphics(fig, nome_arquivo, 'Resolution', 300);
+end
+
+fprintf('Todas as %d figuras foram salvas na ordem correta na pasta "%s"!\n', length(nomes_figuras), pasta_destino);

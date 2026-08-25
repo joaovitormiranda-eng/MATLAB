@@ -1,0 +1,74 @@
+close all
+clear all
+clc
+%%
+s=tf('s');
+m=22.6e-3;
+g=9.81;
+R=21;
+Le=520e-3;
+L0=24.9e-3;
+a=6.72e-3;
+ka=2.1;
+he=4.5e-3;
+ie=(1+he/a)*sqrt(2*a*m*g/L0);
+ve=R*ie/ka;
+k1=L0*ie/(a*(1+he/a)^2);
+k2=L0*ie^2/(a^2*(1+he/a)^3);
+c1=-1.7361e3;
+G=-k1*ka/(m*Le*s^3+m*R*s^2-k2*Le*s-R*k2)
+%% polos em malha aberta
+figure
+pole(c1*G)
+pzmap(c1*G)
+%% LGR malha aberta
+figure
+rlocus(c1*G)
+%% resposta ao impulso em malha-aberta
+figure
+impulse(c1*G)
+%% resposta ao degrau do sistema em malha aberta
+figure
+step(c1*G)
+%% LGR malha fechada c/ controle avanço de fase
+tz=0.04;
+tp=0.004;
+C=(tz*s+1)/(tp*s+1);
+figure
+L=C*c1*G;
+rlocus(L)
+xlim([-300 70])
+ylim([-250 250])
+%% ganho Kp
+kp=1;
+%% diagrama de Bode do controlador avanço de Fase
+figure
+bode(kp*C)
+%% resposta ao impulso do sistema em malha fechada
+T=feedback(kp*C*G,c1);
+pole(T)
+figure
+impulse(T)
+%% resposta ao degrau do sistema em malha fechada
+figure
+step(T)
+%% diagrama de Bode do sistema compensado, não-compensado e do controlador
+figure
+hold on
+bode(c1*G)
+bode(kp*C*c1*G)
+bode(kp*C)
+legend('Sem compensador','Com compensador','Controlador')
+%% diagrama de Nyquist do sistema sem compensador
+figure
+nyquist(c1*G)
+%% diagrama de Nyquist do sistema com compensador
+figure
+nyquist(kp*C*c1*G)
+%% Ganho crítico (estabilidade marginal)
+kc=margin(L)
+Tc=feedback(kc*C*G,c1);
+pole(Tc)
+figure
+[y,t]=step(Tc,0:1e-6:1);
+plot(t,y)

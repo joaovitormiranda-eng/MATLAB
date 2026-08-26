@@ -1,33 +1,41 @@
-% compare_tips.m
+% =========================================================================
+% AUDITORIA COMPARATIVA: CRISP vs. FUZZY
+% Autor: João Vitor Miranda
+% Descrição: Mapeia as superfícies dos modelos Booleano e Nebuloso, 
+%            gerando a renderização 3D lado a lado e o erro MAE.
 % Uso:
 %   [TipC, TipF, mean_diff] = compare_tips()
-% Retorna as matrizes TipC (crisp) e TipF (fuzzy) e a diferença média absoluta
-
+% =========================================================================
 function [TipC, TipF, mean_diff] = compare_tips()
-    % Gera grade igual à do fuzzy manual
-    [F, S] = meshgrid(0:0.5:10, 0:0.5:10);
-    TipF = zeros(size(F));
-    TipC = zeros(size(F));
-    % calcula fuzzy (usa a funcao que já plota)
-    [~, ~, ~, TipGridF] = tip_fuzzy_manual(); % já plota
-    TipF = TipGridF;
+    % Extração da malha Fuzzy Manual
+    [~, F, S, TipF] = tip_fuzzy_manual();
+    close(gcf); close(gcf); % Gerencia pop-ups das subfunções
 
-    % calcula crisp para cada ponto
-    for i = 1:size(F,1)
-        for j = 1:size(F,2)
-            TipC(i,j) = tip_crisp(F(i,j), S(i,j));
-        end
-    end
+    % Extração da malha Crisp (Vetorizada)
+    [~, ~, ~, TipC] = tip_crisp();
+    close(gcf); close(gcf);
 
-    % plota lado a lado
-    figure('Name','Comparacao Crisp x Fuzzy');
-    subplot(1,2,1);
-    surf(F,S,TipC,'EdgeColor','none'); view(45,30);
-    title('Tip - Crisp'); xlabel('Food'); ylabel('Service'); zlabel('Tip (%)');
-    subplot(1,2,2);
-    surf(F,S,TipF,'EdgeColor','none'); view(45,30);
-    title('Tip - Fuzzy'); xlabel('Food'); ylabel('Service'); zlabel('Tip (%)');
+    % --- Visualização Comparativa Integrada ---
+    figure('Name', 'Auditoria: Crisp vs Fuzzy', 'Color', 'w', 'Position', [100, 100, 1100, 450]);
 
+    subplot(1, 2, 1);
+    surf(F, S, TipC, 'EdgeColor', 'none'); view(45, 30);
+    colormap(jet); colorbar; zlim([0 20]);
+    title('Modelo Crisp (Booleano / Degraus)');
+    xlabel('Comida'); ylabel('Serviço'); zlabel('Gorjeta (%)');
+
+    subplot(1, 2, 2);
+    surf(F, S, TipF, 'EdgeColor', 'none'); view(45, 30);
+    colormap(jet); colorbar; zlim([0 20]);
+    title('Modelo Fuzzy (Mamdani / Suave)');
+    xlabel('Comida'); ylabel('Serviço'); zlabel('Gorjeta (%)');
+
+    % --- Métricas Estatísticas de Auditoria ---
     mean_diff = mean(abs(TipF(:) - TipC(:)));
-    fprintf('\nDiferença média absoluta entre superfícies: %0.3f pontos percentuais\n', mean_diff);
+    max_diff  = max(abs(TipF(:) - TipC(:)));
+
+    fprintf('\n================ MÉTRICAS DE AUDITORIA ================\n');
+    fprintf('Diferença Média Absoluta (MAE) : %0.3f p.p.\n', mean_diff);
+    fprintf('Diferença Máxima Absoluta      : %0.3f p.p.\n', max_diff);
+    fprintf('======================================================\n');
 end

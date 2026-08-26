@@ -1,110 +1,134 @@
-% tip_fuzzy_manual.m
+% =========================================================================
+% SISTEMA DE INFERÊNCIA FUZZY MAMDANI (IMPLEMENTAÇÃO VETORIAL NATIVA)
+% Autor: João Vitor Miranda
+% Descrição: Motor Fuzzy completo desenvolvido sem dependência de Toolboxes.
 % Uso:
-%   [val, F, S, TipGrid] = tip_fuzzy_manual(food, service)
-%   [~, F, S, TipGrid] = tip_fuzzy_manual()  % plota e retorna a grade
-%
-% val: escalar (gorjeta %) para o par (food,service)
-% F,S,TipGrid: matriz de grade usada nos plots
-
+%   val = tip_fuzzy_manual(8, 9)     -> Retorna a gorjeta pontual (escalar)
+%   [val, F, S, TipGrid] = tip_fuzzy_manual() -> Plota malhas e retorna dados
+% =========================================================================
 function [val, F, S, TipGrid] = tip_fuzzy_manual(food, service)
-    % universo da saida
-    y = 0:0.1:20; % porcentagem de gorjeta
+    y = 0:0.1:20; % Universo de discurso da saída (Gorjeta %)
 
-    % Funcoes de pertinencia
-    trapmf = @(x,params) max( min( (x-params(1))./(params(2)-params(1)), ...
-                                  min(1, (params(4)-x)./(params(4)-params(3))) ), 0);
-    trimf  = @(x,params) max( min( (x-params(1))./(params(2)-params(1)), ...
-                                  (params(3)-x)./(params(3)-params(2)) ), 0);
+    % --- Funções de Pertinência Robustas (Proteção contra NaN) ---
+    trapmf = @(x, p) max(min( ...
+        min((p(2)==p(1)) + (p(2)~=p(1))*(x - p(1))/max(p(2)-p(1), eps), ...
+            (p(4)==p(3)) + (p(4)~=p(3))*(p(4) - x)/max(p(4)-p(3), eps)), 1), 0);
+    trimf  = @(x, p) max(min((x - p(1))/max(p(2)-p(1), eps), ...
+                             (p(3) - x)/max(p(3)-p(2), eps)), 0);
 
-    mu_food_ruim = @(x) trapmf(x,[0 0 1.5 4]);
-    mu_food_bom  = @(x) trimf(x,[3 5 7]);
-    mu_food_exc  = @(x) trapmf(x,[6 8.5 10 10]);
+    % --- Dicionário de Conjuntos Fuzzy ---
+    mf.food_ruim = @(x) trapmf(x, [0 0 1.5 4]);
+    mf.food_bom  = @(x) trimf(x,  [3 5 7]);
+    mf.food_exc  = @(x) trapmf(x, [6 8.5 10 10]);
 
-    mu_serv_ruim = @(x) trapmf(x,[0 0 1.5 4]);
-    mu_serv_bom  = @(x) trimf(x,[3 5 7]);
-    mu_serv_exc  = @(x) trapmf(x,[6 8.5 10 10]);
+    mf.serv_ruim = @(x) trapmf(x, [0 0 1.5 4]);
+    mf.serv_bom  = @(x) trimf(x,  [3 5 7]);
+    mf.serv_exc  = @(x) trapmf(x, [6 8.5 10 10]);
 
-    mu_tip_pequena = @(z) trimf(z,[0 5 7]);
-    mu_tip_media    = @(z) trimf(z,[8 10 12]);
-    mu_tip_generosa = @(z) trimf(z,[13 15 20]);
+    mf.tip_peq   = @(z) trimf(z,  [0 5 7]);
+    mf.tip_med   = @(z) trimf(z,  [8 10 12]);
+    mf.tip_gen   = @(z) trimf(z,  [13 15 20]);
 
-    % cria grade para plot (sempre)
-    [F, S] = meshgrid(0:0.5:10, 0:0.5:10);
-    TipGrid = zeros(size(F));
-    for i = 1:numel(F)
-        TipGrid(i) = eval_point(F(i), S(i), ...
-            mu_food_ruim, mu_food_bom, mu_food_exc, ...
-            mu_serv_ruim, mu_serv_bom, mu_serv_exc, ...
-            mu_tip_pequena, mu_tip_media, mu_tip_generosa, y);
-    end
-    TipGrid = reshape(TipGrid, size(F));
-
-    % PLOT: sempre mostrar superficie e contorno
-    figure('Name','Fuzzy - Superfície');
-    surf(F, S, TipGrid, 'EdgeColor','none'); view(45,30);
-    xlabel('Food (0-10)'); ylabel('Service (0-10)'); zlabel('Tip (%)');
-    title('Superfície de resposta — Sistema Fuzzy (manual)');
-
-    figure('Name','Fuzzy - Contorno');
-    contourf(F, S, TipGrid, 20);
-    colorbar;
-    xlabel('Food (0-10)'); ylabel('Service (0-10)');
-    title('Mapa de contorno — Gorjeta (%)');
-
-    % Se chamaram sem argumentos, imprime exemplos e retorna TipGrid
-    if nargin == 0
-        examples = [2 2; 2 8; 7 9; 4 4; 1 9];
-        fprintf('\nExemplos (food, service) -> tip (%%)\n');
-        for i = 1:size(examples,1)
-            v = eval_point(examples(i,1), examples(i,2), ...
-                mu_food_ruim, mu_food_bom, mu_food_exc, ...
-                mu_serv_ruim, mu_serv_bom, mu_serv_exc, ...
-                mu_tip_pequena, mu_tip_media, mu_tip_generosa, y);
-            fprintf('(%g, %g) -> %0.2f%%\n', examples(i,1), examples(i,2), v);
-        end
-        val = [];
+    % --- Avaliação Pontual Rápida ---
+    if nargin >= 2
+        val = eval_engine(food, service, mf, y);
+        fprintf('[INFO] Entrada: (Food=%.1f, Service=%.1f) -> Gorjeta: %.2f%%\n', food, service, val);
+        F = []; S = []; TipGrid = [];
         return;
     end
 
-    % Se recebeu (food,service), calcula e tambem garante que os plots foram gerados
-    val = eval_point(food, service, ...
-            mu_food_ruim, mu_food_bom, mu_food_exc, ...
-            mu_serv_ruim, mu_serv_bom, mu_serv_exc, ...
-            mu_tip_pequena, mu_tip_media, mu_tip_generosa, y);
+    % --- Geração de Malha de Alta Resolução ---
+    [F, S] = meshgrid(0:0.1:10, 0:0.1:10);
+    TipGrid = arrayfun(@(f, s) eval_engine(f, s, mf, y), F, S);
 
-    % imprime valor pontual tambem no Command Window
-    fprintf('\nResultado pontual: (food=%g, service=%g) -> tip = %0.2f%%\n', food, service, val);
+    % Cor de fundo Dark Navy (Idêntica ao site)
+    darkBg = [0.03 0.05 0.09];
+
+    % --- 1. Renderização 3D (Dark Theme + Parula do Site) ---
+    figure('Name', 'Superfície de Resposta Fuzzy (Manual)', 'Color', darkBg);
+    surf(F, S, TipGrid, 'EdgeColor', 'none');
+    shading interp; % Gradiente continuo sem sombras artificiais
+
+    colormap(parula);
+    cb = colorbar;
+    cb.Color = 'w';
+
+    ax1 = gca;
+    ax1.Color = darkBg;
+    ax1.XColor = 'w';
+    ax1.YColor = 'w';
+    ax1.ZColor = 'w';
+    ax1.GridColor = [0.4 0.4 0.4];
+    ax1.GridAlpha = 0.3;
+    grid on; box on;
+    zlim([0 20]);
+
+    xlabel('Qualidade da Comida (0-10)', 'FontWeight', 'bold', 'FontSize', 11, 'Color', 'w');
+    ylabel('Qualidade do Serviço (0-10)', 'FontWeight', 'bold', 'FontSize', 11, 'Color', 'w');
+    zlabel('Gorjeta Estimada (%)', 'FontWeight', 'bold', 'FontSize', 11, 'Color', 'w');
+    title('Superficie de Resposta Fuzzy (Mamdani)', 'FontSize', 13, 'FontWeight', 'bold', 'Color', 'w');
+    view(45, 30);
+
+    % --- 2. Mapa de Contorno Fuzzy ---
+    figure('Name', 'Mapa de Contorno Fuzzy', 'Color', darkBg);
+    contourf(F, S, TipGrid, 25, 'LineColor', 'none');
+    colormap(parula);
+    cb2 = colorbar;
+    cb2.Color = 'w';
+
+    ax2 = gca;
+    ax2.Color = darkBg;
+    ax2.XColor = 'w';
+    ax2.YColor = 'w';
+    ax2.GridColor = [0.4 0.4 0.4];
+    ax2.GridAlpha = 0.3;
+    grid on; box on;
+
+    xlabel('Qualidade da Comida (0-10)', 'FontWeight', 'bold', 'FontSize', 11, 'Color', 'w');
+    ylabel('Qualidade do Serviço (0-10)', 'FontWeight', 'bold', 'FontSize', 11, 'Color', 'w');
+    title('Zonas de Atuação Proporcional (Gorjeta %)', 'FontSize', 13, 'FontWeight', 'bold', 'Color', 'w');
+
+    val = [];
 end
 
-% função auxiliar que faz inferência + agregação + defuzz
-function out = eval_point(food, service, ...
-    mu_food_ruim, mu_food_bom, mu_food_exc, ...
-    mu_serv_ruim, mu_serv_bom, mu_serv_exc, ...
-    mu_tip_pequena, mu_tip_media, mu_tip_generosa, y)
+% --- Engine de Inferência e Defuzzificação ---
+function out = eval_engine(food, service, mf, y)
+    food = max(0, min(10, food));
+    service = max(0, min(10, service));
 
-    % pertinencias entradas
-    a1 = mu_food_ruim(food); a2 = mu_food_bom(food); a3 = mu_food_exc(food);
-    b1 = mu_serv_ruim(service); b2 = mu_serv_bom(service); b3 = mu_serv_exc(service);
+    % Fuzzificação
+    a1 = mf.food_ruim(food); a2 = mf.food_bom(food); a3 = mf.food_exc(food);
+    b1 = mf.serv_ruim(service); b2 = mf.serv_bom(service); b3 = mf.serv_exc(service);
 
-    % regras (AND=min, OR=max)
-    r1 = min(a1, b1);       % ruim & ruim -> pequena
-    r2 = min(a2, b2);       % bom & bom -> media
-    r3 = max(a3, b3);       % excelente OR excelente -> generosa
-    r4 = min(a1, b2);       % ruim & bom -> media
-    r5 = min(a2, b3);       % bom & excelente -> generosa
+    % Avaliação das Regras (Mamdani: T-norma Min / S-norma Max)
+    r1 = min(a1, b1); % Ruim & Ruim -> Pequena
+    r2 = min(a2, b2); % Bom & Bom -> Média
+    r3 = max(a3, b3); % Excelente OR Excelente -> Generosa
+    r4 = min(a1, b2); % Ruim & Bom -> Média
+    r5 = min(a2, b3); % Bom & Excelente -> Generosa
 
-    % agrega por clipping e max
+    % Agregação dos Conjuntos Fuzzy de Saída (Clipping)
     agg = zeros(size(y));
-    if r1>0, agg = max(agg, min(r1, mu_tip_pequena(y))); end
-    if r2>0, agg = max(agg, min(r2, mu_tip_media(y))); end
-    if r3>0, agg = max(agg, min(r3, mu_tip_generosa(y))); end
-    if r4>0, agg = max(agg, min(r4, mu_tip_media(y))); end
-    if r5>0, agg = max(agg, min(r5, mu_tip_generosa(y))); end
+    if r1 > 0, agg = max(agg, min(r1, mf.tip_peq(y))); end
+    if r2 > 0, agg = max(agg, min(r2, mf.tip_med(y))); end
+    if r3 > 0, agg = max(agg, min(r3, mf.tip_gen(y))); end
+    if r4 > 0, agg = max(agg, min(r4, mf.tip_med(y))); end
+    if r5 > 0, agg = max(agg, min(r5, mf.tip_gen(y))); end
 
-    % defuzz centroid
-    if sum(agg) == 0
+    % Defuzzificação pelo Método do Centroide
+    sum_agg = sum(agg);
+    if sum_agg == 0
         out = 0;
     else
-        out = sum(agg .* y) / sum(agg);
+        out = sum(agg .* y) / sum_agg;
     end
 end
+
+% Executa e gera as figuras
+[~, F, S, TipGrid] = tip_fuzzy_manual();
+
+% Exporta a Superfície 3D (Figura 1)
+exportgraphics(figure(1), 'fuzzy-superficie-resposta-3d.png', 'Resolution', 300);
+
+% Exporta o Mapa de Contorno (Figura 2)
+exportgraphics(figure(2), 'fuzzy-mapa-contorno-2d.png', 'Resolution', 300);

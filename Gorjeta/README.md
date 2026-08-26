@@ -26,7 +26,7 @@ Motor de Inferência Nebulosa (\*Fuzzy Logic\*) Mamdani desenvolvido integralmen
 
 | :--- | :--- |
 
-| `tip\_fuzzy\_manual.m` | \*\*Core Engine:\*\* Motor Fuzzy Mamdani nativo com defuzzificação por Centroide, amostragem $0.1$ e visualização 3D Dark Theme. |
+| `tip\_fuzzy\_manual.m` | \*\*Core Engine:\*\* Motor Fuzzy Mamdani nativo com defuzzificação por Centroide, amostragem 0.1 e visualização 3D Dark Theme. |
 
 | `tip\_crisp.m` | \*\*Baseline Crisp:\*\* Sistema booleano de regras rígidas (\*if/else\*) vetorizado com `arrayfun`. |
 
@@ -54,13 +54,9 @@ Para calcular a saída exata para uma determinada entrada (ex: Comida = 8, Servi
 
 
 
-```matlab
+&#x20;   >> val = tip\_fuzzy\_manual(8, 9)
 
->> val = tip\_fuzzy\_manual(8, 9)
-
-\[INFO] Entrada: (Food=8.0, Service=9.0) -> Gorjeta: 14.98%
-
-```
+&#x20;   \[INFO] Entrada: (Food=8.0, Service=9.0) -> Gorjeta: 14.98%
 
 
 
@@ -70,11 +66,7 @@ Execute a função sem argumentos para renderizar as malhas em alta definição 
 
 
 
-```matlab
-
->> tip\_fuzzy\_manual()
-
-```
+&#x20;   >> tip\_fuzzy\_manual()
 
 
 
@@ -84,11 +76,7 @@ Rode o script de auditoria para obter as diferenças estatísticas entre a abord
 
 
 
-```matlab
-
->> \[TipC, TipF, MAE] = compare\_tips()
-
-```
+&#x20;   >> \[TipC, TipF, MAE] = compare\_tips()
 
 
 
@@ -104,7 +92,7 @@ Rode o script de auditoria para obter as diferenças estatísticas entre a abord
 
 \* \*\*Inferência:\*\* Método Mamdani com Operador T-Norma (`min`) para conjuntivas e S-Norma (`max`) para disjuntivas.
 
-\* \*\*Defuzzificação:\*\* Centroide (Centro de Gravidade) contínuo sobre universo de discurso discretizado ($0$ a $20\\%$).
+\* \*\*Defuzzificação:\*\* Centroide (Centro de Gravidade) contínuo sobre universo de discurso discretizado (0 a 20%).
 
 
 
